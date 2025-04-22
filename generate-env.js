@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 
 const env = {
   production: true,
@@ -14,8 +15,15 @@ const env = {
   }
 };
 
+// Ensure the src/environments directory exists
+const envDir = path.resolve(__dirname, 'src/environments');
+if (!fs.existsSync(envDir)) {
+  fs.mkdirSync(envDir, { recursive: true });
+}
+
+// Write the environment.prod.ts file
 fs.writeFileSync(
-  './src/environments/environment.prod.ts',
+  path.join(envDir, 'environment.prod.ts'),
   `export interface Environment {
      production: boolean;
      mapboxAccessToken: string;
