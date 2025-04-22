@@ -1,0 +1,57 @@
+<div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="logo-container">
+          <div class="logo"></div>
+        </div>
+        <h1>Poultry Map Administration</h1>
+        <p>Enter your credentials to access the configuration panel</p>
+      </div>
+      
+      <div class="login-body">
+        <form (submit)="login(); $event.preventDefault()">
+          <div class="form-group">
+            <label for="username" class="form-label">Username</label>
+            <div class="input-with-icon">
+              <i class="icon user-icon"></i>
+              <input 
+                type="text" 
+                id="username" 
+                class="form-control"
+                [(ngModel)]="username" 
+                name="username"
+                placeholder="Enter your username"
+                autocomplete="username">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-with-icon">
+              <i class="icon lock-icon"></i>
+              <input 
+                type="password" 
+                id="password" 
+                class="form-control"
+                [(ngModel)]="password" 
+                name="password"
+                placeholder="Enter your password"
+                autocomplete="current-password">
+            </div>
+          </div>
+          
+          <div *ngIf="errorMessage" class="error-message">
+            <i class="icon error-icon"></i>
+            {{ errorMessage }}
+          </div>
+          
+          <button type="submit" class="login-button" [disabled]="isLoading">
+            <span *ngIf="!isLoading">Login</span>
+            <span *ngIf="isLoading" class="spinner"></span>
+          </button>
+        </form>
+      </div>
+      
+    </div>
+  </div>
+  

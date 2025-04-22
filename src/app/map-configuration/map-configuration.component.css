@@ -1,0 +1,373 @@
+.config-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.config-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+h2 {
+  font-size: 32px;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+}
+
+.subtitle {
+  color: #7f8c8d;
+  font-size: 16px;
+  margin: 0;
+}
+
+.config-container {
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 30px;
+}
+
+.config-section {
+  padding: 30px;
+  border-bottom: 1px solid #eee;
+}
+
+.config-section:last-child {
+  border-bottom: none;
+}
+
+h3 {
+  font-size: 22px;
+  color: #34495e;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 18px;
+  color: #34495e;
+  margin-top: 20px;
+  margin-bottom: 15px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+}
+
+.section-description {
+  color: #7f8c8d;
+  font-size: 15px;
+  margin-top: 0;
+  margin-bottom: 25px;
+}
+
+.style-selector select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  background-color: white;
+  margin-bottom: 25px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.style-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.style-preview {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.style-preview:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.style-preview.selected {
+  border-color: #3a86ff;
+}
+
+.style-preview img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.style-preview span {
+  display: block;
+  padding: 10px;
+  text-align: center;
+  font-size: 14px;
+  background-color: #f8f9fa;
+  font-weight: 500;
+}
+
+.input-group {
+  margin-bottom: 25px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 500;
+  color: #444;
+  font-size: 15px;
+}
+
+.input-group input[type="number"] {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.input-group input[type="number"]:focus {
+  border-color: #3a86ff;
+  box-shadow: 0 0 0 3px rgba(58, 134, 255, 0.2);
+  outline: none;
+}
+
+.slider-group input[type="range"] {
+  width: 100%;
+  margin: 10px 0;
+  height: 6px;
+  -webkit-appearance: none;
+  background: #e0e0e0;
+  border-radius: 3px;
+  outline: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #3a86ff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.slider-group input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #3a86ff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #7f8c8d;
+  margin-top: 5px;
+}
+
+.value-display {
+  display: inline-block;
+  min-width: 40px;
+  padding: 3px 8px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  text-align: center;
+  margin-left: 8px;
+}
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-item label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.popup-preview {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 25px;
+}
+
+.popup-content {
+  background-color: white;
+  border-radius: 6px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.popup-field {
+  margin-bottom: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.popup-field:last-child {
+  margin-bottom: 0;
+}
+
+.popup-field strong {
+  font-weight: 500;
+  color: #444;
+}
+
+.sample-value {
+  color: #666;
+}
+
+.empty-message {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 15px;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  min-width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-primary {
+  background-color: #3a86ff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #2667cc;
+}
+
+.btn-primary:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: white;
+  color: #555;
+  border: 1px solid #ddd;
+}
+
+.btn-secondary:hover {
+  background-color: #f5f5f5;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.config-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+.btn-reset, .btn-save {
+  padding: 14px 30px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-reset {
+  background-color: white;
+  color: #555;
+  border: 1px solid #ddd;
+}
+
+.btn-reset:hover {
+  background-color: #f5f5f5;
+}
+
+.btn-save {
+  background-color: #3a86ff;
+  color: white;
+}
+
+.btn-save:hover {
+  background-color: #2667cc;
+}
+
+@media (max-width: 768px) {
+  .checkbox-group {
+    grid-template-columns: 1fr;
+  }
+  
+  .style-preview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  
+  .config-actions {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .btn-reset, .btn-save {
+    width: 100%;
+  }
+  
+  .btn-reset {
+    order: 2;
+  }
+  
+  .btn-save {
+    order: 1;
+  }
+}
