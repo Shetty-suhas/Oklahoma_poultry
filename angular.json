@@ -30,7 +30,11 @@
                 "input": "src/assets",
                 "output": "assets"
               },
-              "src/_redirects"
+              {
+                "glob": "_redirects",
+                "input": "src",
+                "output": "/"
+              }
             ],
             "styles": [
               "node_modules/mapbox-gl/dist/mapbox-gl.css",
