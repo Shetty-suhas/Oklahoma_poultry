@@ -1,11 +1,11 @@
 .custom-marker {
-    cursor: pointer;
-    transform: translate(-50%, -100%);
-    display: inline-block;
-  }
-  
-  .custom-marker svg {
-    display: block;
-    max-width: 30px;
-    max-height: 30px;
-  }
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  display: inline-block;
+}
+
+.custom-marker svg {
+  display: block;
+  max-width: 20px;
+  max-height: 20px;
+}
