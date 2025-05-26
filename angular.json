@@ -39,7 +39,8 @@
             ],
             "styles": [
               "node_modules/mapbox-gl/dist/mapbox-gl.css",
-              "src/styles.css"
+              "src/styles.css",
+              "node_modules/ngx-toastr/toastr.css"
             ],
             "scripts": [],
             "allowedCommonJsDependencies": ["mapbox-gl"]

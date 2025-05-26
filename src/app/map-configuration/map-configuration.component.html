@@ -145,14 +145,6 @@
           <option *ngFor="let style of availableMapStyles" [value]="style.id">{{ style.name }}</option>
         </select>
       </div>
-
-      <div class="style-preview-grid">
-        <div *ngFor="let style of availableMapStyles" class="style-preview"
-          [class.selected]="style.id === config.mapStyleName" (click)="config.mapStyleName = style.id">
-          <img [src]="getImagePath(style.id)" [alt]="style.name">
-          <span>{{ style.name }}</span>
-        </div>
-      </div>
     </div>
 
     <!-- Map Position Section -->

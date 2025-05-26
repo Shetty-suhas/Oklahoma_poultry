@@ -20,6 +20,7 @@
     "@angular/router": "^19.2.0",
     "firebase": "^11.6.0",
     "mapbox-gl": "^3.11.0",
+    "ngx-toastr": "^19.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "xlsx": "^0.18.5",

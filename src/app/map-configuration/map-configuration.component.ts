@@ -5,6 +5,7 @@ import { Router, NavigationStart } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { MapConfigService, MapConfig } from '../services/map-config.service';
 import { Subscription } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 
 interface CsvMapping {
   latitude: string;
@@ -92,14 +93,14 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   Math = Math;
 
   availableMapStyles: { id: string; name: string; imagePath: string }[] = [
-    { id: 'streets', name: 'Streets', imagePath: 'assets/mapstyles/streets.png' },
-    { id: 'outdoors', name: 'Outdoors', imagePath: 'assets/mapstyles/outdoors.png' },
-    { id: 'light', name: 'Light', imagePath: 'assets/mapstyles/light.png' },
-    { id: 'dark', name: 'Dark', imagePath: 'assets/mapstyles/dark.png' },
-    { id: 'satellite', name: 'Satellite', imagePath: 'assets/mapstyles/satellite.png' },
-    { id: 'satelliteStreets', name: 'Satellite Streets', imagePath: 'assets/mapstyles/satellitestreets.png' },
-    { id: 'navigationDay', name: 'Navigation Day', imagePath: 'assets/mapstyles/navigationday.png' },
-    { id: 'navigationNight', name: 'Navigation Night', imagePath: 'assets/mapstyles/navigationnight.png' }
+    { id: 'streets', name: 'Streets', imagePath: 'assets/streets.png' },
+    { id: 'outdoors', name: 'Outdoors', imagePath: 'assets/outdoors.png' },
+    { id: 'light', name: 'Light', imagePath: 'assets/light.png' },
+    { id: 'dark', name: 'Dark', imagePath: 'assets/dark.png' },
+    { id: 'satellite', name: 'Satellite', imagePath: 'assets/satellite.png' },
+    { id: 'satelliteStreets', name: 'Satellite Streets', imagePath: 'assets/satellitestreets.png' },
+    { id: 'navigationDay', name: 'Navigation Day', imagePath: 'assets/navigationday.png' },
+    { id: 'navigationNight', name: 'Navigation Night', imagePath: 'assets/navigationnight.png' }
   ];
   selectedPopupFields: any;
   renames: any;
@@ -107,7 +108,8 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private mapConfigService: MapConfigService,
-    private http: HttpClient
+    private http: HttpClient,
+    private toastr: ToastrService
   ) {
     // this.config = { ...this.mapConfigService.getCurrentConfig() };
     // this.loadFieldDisplayNames();
@@ -130,17 +132,16 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
       next: (config) => {
         this.selectedMapConfiguration = config.name;
         this.currentAppliedConfig = config.name;
-        console.log('Selected map configuration loaded:', config.name);
+        this.toastr.success('Selected map configuration loaded: ' + config.name);
         this.isLoading = false;
       },
       error: (err) => {
-        console.error('Failed to load selected map configuration:', err);
+        this.toastr.error('Failed to load selected map configuration');
         this.selectedMapConfiguration = '';
         this.currentAppliedConfig = '';
         this.isLoading = false;
       }
     });
-    console.log('Component initialized, csvImportStep:', this.csvImportStep, 'csvPreviewData:', this.csvPreviewData.length);
   
     this.routerSubscription = this.router.events.subscribe(event => {
       if (event instanceof NavigationStart && this.uploadedCollectionName) {
@@ -211,14 +212,17 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   saveMarkerDesign(): void {
     if (!this.markerDesignName.trim()) {
       this.markerDesignNameError = 'Marker design name is required';
+      this.toastr.error(this.markerDesignNameError);
       return;
     }
     if (!this.markerDesign.trim()) {
       this.markerDesignError = 'SVG code is required';
+      this.toastr.error(this.markerDesignNameError);
       return;
     }
     if (!this.markerDesign.trim().toLowerCase().startsWith('<svg')) {
       this.markerDesignError = 'SVG code must start with <svg>';
+      this.toastr.error(this.markerDesignNameError);
       return;
     }
     const payload = {
@@ -229,11 +233,13 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     };
     this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//save-marker-design', payload).subscribe({
       next: (response: any) => {
-        this.uploadStatus = response.message;
+        this.uploadStatus = response.message; 
+        this.toastr.success(this.uploadStatus || "Marker design saved successfully");
         this.cancelMarkerDesign();
       },
       error: (err) => {
         this.markerDesignError = err.error?.error || 'Failed to save marker design';
+        this.toastr.error(this.markerDesignError);
       }
     });
   }
@@ -358,15 +364,18 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   confirmFieldsConfig(): void {
     if (!this.selectedFieldsCollection) {
       this.uploadStatus = 'Error: No collection selected';
+      this.toastr.error(this.uploadStatus);
       return;
     }
     if (!this.configurationName.trim()) {
       this.configurationNameError = 'Configuration name is required';
       this.uploadStatus = 'Error: Configuration name is required';
+      this.toastr.error(this.uploadStatus);
       return;
     }
     if (this.selectedPopupFields.length === 0) {
       this.uploadStatus = 'Error: At least one field must be selected';
+      this.toastr.error(this.uploadStatus);
       return;
     }
 
@@ -382,11 +391,11 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
         this.uploadStatus = response.message || 'Configuration saved successfully';
         this.fetchConfigurations();
         this.cancelFieldsConfig();
-        console.log('Configuration saved:', response);
+        this.toastr.success(this.uploadStatus || "Configuration saved successfully");
       },
       error: (err) => {
         this.uploadStatus = `Error saving configuration: ${err.error?.error || 'Request failed'}`;
-        console.error('Save configuration error:', err);
+        this.toastr.error(this.uploadStatus);
       }
     });
   }
@@ -446,6 +455,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     if (!this.configurationName.trim()) {
       this.configurationNameError = 'Configuration name is required';
       this.uploadStatus = 'Configuration name is required';
+      this.toastr.error(this.uploadStatus);
       return;
     }
     this.showConfigNameModal = false;
@@ -462,10 +472,12 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//save-map-config', configData).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message || 'Configuration saved successfully';
+        this.toastr.success(this.uploadStatus || "Configuration saved successfully");
       },
       error: (err) => {
         this.uploadStatus = `Error saving configuration: ${err.error?.error || 'Request failed'}`;
         console.error('Save configuration error:', err);
+        this.toastr.error(this.uploadStatus);
       }
     });
   }
@@ -529,14 +541,13 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     if (!this.csvFile || !this.collectionName.trim()) {
       this.uploadStatus = 'Error: File and collection name are required';
       this.csvImportError = this.uploadStatus;
-      console.log('Upload failed: missing file or collection name, csvImportStep:', this.csvImportStep);
+      this.toastr.error(this.uploadStatus);
       return;
     }
 
     this.isProcessingCsv = true;
     this.uploadStatus = 'Uploading file...';
-    console.log('Uploading file, csvImportStep:', this.csvImportStep, 'collectionName:', this.collectionName);
-
+    this.toastr.info('Uploading file...');
     const formData = new FormData();
     formData.append('file', this.csvFile, this.csvFile.name);
     formData.append('collectionName', this.collectionName);
@@ -548,7 +559,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
         this.csvImportStep = 3;
         this.uploadedCollectionName = response.collectionName;
         this.isNewUpload = true;
-        console.log('Upload successful, moved to step 3, csvImportStep:', this.csvImportStep, 'collectionName:', this.uploadedCollectionName, 'response:', response);
+        this.toastr.success(this.uploadStatus || "File uploaded successfully");
         this.fetchUploadedData(response.collectionName);
       },
       error: (error) => {
@@ -556,7 +567,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
         this.csvImportError = this.uploadStatus;
         this.isProcessingCsv = false;
         this.csvImportStep = 2;
-        console.error('Upload error, staying at step 2, csvImportStep:', this.csvImportStep, 'error:', error);
+        this.toastr.error(this.uploadStatus);
       }
     });
   }
@@ -599,7 +610,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     if (!this.uploadedCollectionName) {
       this.uploadStatus = 'Error: No collection to confirm';
       this.csvImportError = this.uploadStatus;
-      console.log('Confirm failed: no collection, csvImportStep:', this.csvImportStep);
+      this.toastr.error(this.uploadStatus);
       return;
     }
 
@@ -613,12 +624,12 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
         this.csvPreviewData = [];
         this.csvHeaders = [];
         this.fetchCollections();
-        console.log('Confirm successful, reset to step 1, csvImportStep:', this.csvImportStep, 'response:', response);
+        this.toastr.success(this.uploadStatus || "Collection confirmed'");
       },
       error: (error) => {
         this.uploadStatus = `Error confirming collection: ${error.error?.error || 'Request failed'}`;
         this.csvImportError = this.uploadStatus;
-        console.error('Confirm error, csvImportStep:', this.csvImportStep, 'error:', error);
+        this.toastr.error(this.uploadStatus);
       }
     });
   }
@@ -755,10 +766,11 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
       next: (response: any) => {
         this.currentAppliedConfig = config;
         this.uploadStatus = response.message || 'Map configuration applied';
+        this.toastr.success(this.uploadStatus || "Map configuration applied successfully");
       },
       error: (err) => {
         this.uploadStatus = `Error applying configuration: ${err.error?.error || 'Request failed'}`;
-        console.error('Apply configuration error:', err);
+        this.toastr.error(this.uploadStatus);
         this.isLoading = false;
       }
     });
