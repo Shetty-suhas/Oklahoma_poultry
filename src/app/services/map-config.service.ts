@@ -1,69 +1,77 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Observable, BehaviorSubject, of } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 export interface MapConfig {
+  name: string;
   mapStyleName: string;
   center: [number, number];
   zoom: number;
   clusterRadius: number;
   clusterMaxZoom: number;
-  popupFields: string[];
+  configurationName: string;
+  markerDesignName: string;
+}
+
+export interface Configuration {
+  collectionName: string;
+  configurationName: string;
+  selectedColumns: string[];
+  renames: { original: string; renamed: string }[];
+}
+
+export interface MarkerDesign {
+  name: string;
+  svg: string;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class MapConfigService {
-  private configUrl = 'assets/config/map-config.json';
-  private defaultConfig: MapConfig = {
-    mapStyleName: 'streets',
-    center: [-94.8945, 36.204182],
-    zoom: 8,
-    clusterRadius: 50,
-    clusterMaxZoom: 14,
-    popupFields: ['Integrator', 'Registered number of houses', 'Registered number of birds']
-  };
-  private currentConfig: MapConfig = { ...this.defaultConfig };
-  private configSubject = new BehaviorSubject<MapConfig>({ ...this.currentConfig });
+  private apiUrl = 'https://my-flask-app-1033096764168.asia-south1.run.app/';
 
-  constructor(private http: HttpClient) {
-    console.log('MapConfigService initialized with default config:', this.currentConfig);
-    this.loadConfig().subscribe();
-  }
+  constructor(private http: HttpClient) {}
 
-  loadConfig(): Observable<MapConfig> {
-    return this.http.get<MapConfig>(this.configUrl).pipe(
-      tap(config => {
-        this.currentConfig = { ...config };
-        this.configSubject.next({ ...this.currentConfig });
-        console.log('Loaded config from map-config.json:', this.currentConfig);
-      }),
-      catchError((error: HttpErrorResponse) => {
-        console.warn('Failed to load map-config.json, using default config:', error.message);
-        this.currentConfig = { ...this.defaultConfig };
-        this.configSubject.next({ ...this.currentConfig });
-        return of(this.currentConfig);
+  getConfig(configName?: string): Observable<MapConfig | null> {
+    if (!configName) {
+      return of(null);
+    }
+    return this.http.get<MapConfig>(`${this.apiUrl}/map-config/${configName}`).pipe(
+      catchError((error) => {
+        console.error('Error fetching map config:', error);
+        return of(null);
       })
     );
   }
 
-  getConfig(): Observable<MapConfig> {
-    return this.configSubject.asObservable();
+  getConfiguration(configurationName: string): Observable<Configuration | null> {
+    return this.http.get<Configuration>(`${this.apiUrl}/config/${configurationName}`).pipe(
+      catchError((error) => {
+        console.error('Error fetching configuration:', error);
+        return of(null);
+      })
+    );
   }
 
-  getCurrentConfig(): MapConfig {
-    console.log('getCurrentConfig called, returning:', this.currentConfig);
-    return { ...this.currentConfig };
+  getMarkerDesign(markerDesignName: string): Observable<MarkerDesign | null> {
+    return this.http.get<{ markerDesign: MarkerDesign }>(`${this.apiUrl}/marker-design/${markerDesignName}`).pipe(
+      map(response => response.markerDesign),
+      catchError((error) => {
+        console.error('Error fetching marker design:', error);
+        return of(null);
+      })
+    );
   }
 
-  saveConfig(config: MapConfig): Observable<void> {
-    this.currentConfig = { ...config };
-    this.configSubject.next({ ...this.currentConfig });
-    console.log('Configuration updated in memory:', this.currentConfig);
-    console.log('To persist changes across sessions, copy the following JSON into src/assets/config/map-config.json:');
-    console.log(JSON.stringify(this.currentConfig, null, 2));
-    return of(void 0);
+  getData(collectionName: string): Observable<any[]> {
+    return this.http.get<{ data: any[] }>(`${this.apiUrl}/poultry-data/${collectionName}?per_page=1000`).pipe(
+      map(response => response.data),
+      catchError((error) => {
+        console.error('Error fetching data:', error);
+        return of([]);
+      })
+    );
   }
 }

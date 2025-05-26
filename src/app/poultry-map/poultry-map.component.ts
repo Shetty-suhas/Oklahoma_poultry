@@ -1,10 +1,18 @@
-import { Component, Input, OnInit, AfterViewInit, ViewChild, ElementRef, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, OnInit, AfterViewInit, ViewChild, ElementRef, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import * as mapboxgl from 'mapbox-gl';
 import { environment } from '../../environments/environment';
-import poultryData from '../../assets/poultry-farms.json';
 import { createCustomMarker } from '../custom-marker/custom-marker';
-import { MapConfigService, MapConfig } from '../services/map-config.service';
+import { MapConfigService, MapConfig, MarkerDesign } from '../services/map-config.service';
+import { Subscription } from 'rxjs';
+
+interface FieldConfig {
+  collectionName: string;
+  configurationName: string;
+  selectedColumns: string[];
+  renames: { original: string; renamed: string }[];
+}
 
 @Component({
   selector: 'app-poultry-map',
@@ -13,48 +21,26 @@ import { MapConfigService, MapConfig } from '../services/map-config.service';
   templateUrl: './poultry-map.component.html',
   styleUrls: ['./poultry-map.component.css', '../custom-marker/custom-marker.css']
 })
-export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges {
+export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('mapContainer') mapContainer!: ElementRef;
-  @Input() mapStyle: string = 'mapbox://styles/mapbox/streets-v12';
-  @Input() center: [number, number] = [-96.921387, 36.084621];
-  @Input() zoom: number = 8;
-  @Input() farms: any[] = poultryData;
+  @Input() selectedConfiguration: string = '';
 
-  map!: mapboxgl.Map;
+  map?: mapboxgl.Map;
   private markers: mapboxgl.Marker[] = [];
   private isMapLoaded = false;
   private popup: mapboxgl.Popup | null = null;
+  private farms: any[] = [];
+  private configuration: FieldConfig | null = null;
+  private markerSvg: string = '';
+  private mapStyle: string | null = null;
+  private center: [number, number] | null = null;
+  private zoom: number | null = null;
+  private clusterRadius: number | null = null;
+  private clusterMaxZoom: number | null = null;
+  private subscriptions: Subscription[] = [];
+  private currentAppliedConfig: string = '';
 
-  private config = {
-    popup: {
-      width: '300px',
-      maxWidth: '90vw',
-      padding: '12px',
-      fontSize: '11px',
-      columnGap: '15px',
-      backgroundColor: '#fff',
-      fields: ['Integrator', 'Registered number of houses', 'Registered number of birds']
-    },
-    map: {
-      defaultCenter: [151.2093, -33.8688] as [number, number],
-      defaultZoom: 8,
-      defaultStyle: 'mapbox://styles/mapbox/streets-v12'
-    },
-    cluster: {
-      clusterMaxZoom: 14,
-      clusterRadius: 50,
-      circleColors: ['#51bbd6', '#f1f075', '#f28cb1'],
-      circleRadii: [20, 30, 40],
-      colorSteps: [100, 750]
-    },
-    fonts: {
-      popupFont: 'Arial, sans-serif',
-      clusterFont: ['Open Sans Regular', 'Arial Unicode MS Bold'],
-      textSize: 12
-    }
-  };
-
-  mapStyles: { [key: string]: string } = {
+  private mapStyles: { [key: string]: string } = {
     streets: 'mapbox://styles/mapbox/streets-v12',
     outdoors: 'mapbox://styles/mapbox/outdoors-v12',
     light: 'mapbox://styles/mapbox/light-v11',
@@ -65,21 +51,47 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges {
     navigationNight: 'mapbox://styles/mapbox/navigation-night-v1'
   };
 
-  constructor(private mapConfigService: MapConfigService) {}
+  private popupConfig = {
+    width: '300px',
+    maxWidth: '90vw',
+    padding: '12px',
+    fontSize: '11px',
+    columnGap: '15px',
+    backgroundColor: '#fff',
+    font: 'Arial, sans-serif'
+  };
+
+  private clusterConfig = {
+    circleColors: ['#51bbd6', '#f1f075', '#f28cb1'],
+    circleRadii: [20, 30, 40],
+    colorSteps: [100, 750],
+    textFont: ['Open Sans Regular', 'Arial Unicode MS Bold'],
+    textSize: 12
+  };
+
+  constructor(
+    private mapConfigService: MapConfigService,
+    private http: HttpClient
+  ) {}
 
   ngOnInit() {
-    console.log('PoultryMapComponent ngOnInit - Farms:', this.farms);
     this.popup = new mapboxgl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      offset: [0, -10]
+      closeButton: true,
+      closeOnClick: true,
+      offset: [0, -10],
+      maxWidth: this.popupConfig.maxWidth
     });
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['farms'] && this.map && this.isMapLoaded) {
-      console.log('Farms changed:', this.farms);
-      this.updateMarkers();
+    if (changes['selectedConfiguration']) {
+      if (this.selectedConfiguration) {
+        console.log('Selected configuration changed:', this.selectedConfiguration);
+        this.loadConfiguration();
+      } else {
+        console.warn('No configuration selected');
+        this.clearMap();
+      }
     }
   }
 
@@ -88,67 +100,160 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges {
       console.error('Map container not found');
       return;
     }
-    console.log('Map container found:', this.mapContainer.nativeElement);
-    console.log('Mapbox access token:', environment.mapboxAccessToken ? 'Set' : 'Missing');
-    this.mapConfigService.getConfig().subscribe(config => {
-      console.log('Received config:', config);
-      if (config) {
-        this.applySavedConfig(config);
-      } else {
-        console.warn('Using default config');
-        this.mapStyle = this.config.map.defaultStyle;
-        this.center = this.config.map.defaultCenter;
-        this.zoom = this.config.map.defaultZoom;
+    this.loadConfiguration();
+  }
+
+  ngOnDestroy() {
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+    if (this.map) {
+      this.map.remove();
+    }
+    if (this.popup) {
+      this.popup.remove();
+    }
+  }
+
+  private loadConfiguration() {
+    this.subscriptions.push(
+      this.http.get<MapConfig>('https://my-flask-app-1033096764168.asia-south1.run.app//get-selected-map-config').subscribe({
+        next: (mapConfig) => {
+          if (!mapConfig) {
+            console.error('Invalid or missing map configuration');
+            this.clearMap();
+            return;
+          }
+          this.applyMapConfig(mapConfig);
+          if (mapConfig.configurationName) {
+            this.subscriptions.push(
+              this.http.get<FieldConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app//configurations/${mapConfig.configurationName}`).subscribe({
+                next: (fieldConfig) => {
+                  this.configuration = fieldConfig;
+                  if (fieldConfig?.collectionName && fieldConfig.selectedColumns.length) {
+                    this.loadCollectionData(fieldConfig.collectionName, fieldConfig.selectedColumns);
+                  }
+                },
+                error: (err) => console.error('Failed to load field configuration:', err)
+              })
+            );
+          }
+          if (mapConfig.markerDesignName) {
+            this.subscriptions.push(
+              this.mapConfigService.getMarkerDesign(mapConfig.markerDesignName).subscribe({
+                next: (design) => {
+                  this.markerSvg = design?.svg || '';
+                  if (this.isMapLoaded) {
+                    this.updateMarkers();
+                  }
+                },
+                error: () => console.error('Failed to load marker design')
+              })
+            );
+          }
+          if (!this.isMapLoaded && this.canInitializeMap()) {
+            this.initializeMap();
+          } else if (this.isMapLoaded) {
+            this.updateMap();
+          }
+        },
+        error: () => {
+          console.error('Failed to load map configuration');
+          this.clearMap();
+        }
+      })
+    );
+  }
+
+  private loadCollectionData(collectionName: string, selectedColumns: string[]) {
+    const requestBody = {
+      fields: selectedColumns
+    };
+    console.log('Request body:', requestBody);
+    this.subscriptions.push(
+      this.http.post<any[]>(`https://my-flask-app-1033096764168.asia-south1.run.app//collections/${collectionName}`, requestBody).subscribe({
+        next: (data) => {
+          this.farms = data;
+          console.log('Loaded collection data:', this.farms);
+          if (this.isMapLoaded) {
+            this.updateMap();
+          }
+        },
+        error: (err) => console.error('Failed to load collection data:', err)
+      })
+    );
+  }
+
+  private applyMapConfig(mapConfig: MapConfig) {
+    this.mapStyle = this.mapStyles[mapConfig.mapStyleName];
+    if (!this.mapStyle) {
+      console.error(`Invalid map style: ${mapConfig.mapStyleName}`);
+      this.mapStyle = null;
+    }
+    this.center = mapConfig.center;
+    this.zoom = mapConfig.zoom;
+    this.clusterRadius = mapConfig.clusterRadius;
+    this.clusterMaxZoom = mapConfig.clusterMaxZoom;
+    console.log('Applied map config:', mapConfig);
+  }
+
+  private canInitializeMap(): boolean {
+    return !!(
+      this.mapStyle &&
+      this.center &&
+      this.zoom !== null &&
+      this.clusterRadius !== null &&
+      this.clusterMaxZoom !== null &&
+      this.mapContainer?.nativeElement
+    );
+  }
+
+  private clearMap() {
+    this.farms = [];
+    this.configuration = null;
+    this.markerSvg = '';
+    this.mapStyle = null;
+    this.center = null;
+    this.zoom = null;
+    this.clusterRadius = null;
+    this.clusterMaxZoom = null;
+    if (this.isMapLoaded) {
+      this.clearMarkers();
+      this.isMapLoaded = false;
+      if (this.map) {
+        this.map.remove();
+        this.map = undefined;
       }
-      this.initializeMap();
+    }
+  }
+
+  private updateMap() {
+    if (!this.isMapLoaded || !this.canInitializeMap()) {
+      console.warn('Cannot update map, invalid state');
+      return;
+    }
+    this.map!.setStyle(this.mapStyle!);
+    this.map!.setCenter(this.center!);
+    this.map!.setZoom(this.zoom!);
+    this.map!.once('style.load', () => {
+      this.isMapLoaded = true;
+      this.addClusterSource();
+      this.addClusterLayers();
+      this.updateMarkers();
     });
   }
 
-  @Input() set mapStyleName(name: keyof typeof this.mapStyles) {
-    if (name && this.mapStyles[name]) {
-      this.mapStyle = this.mapStyles[name];
-      if (this.map) {
-        this.changeMapStyle(this.mapStyle);
-      }
-    }
-  }
-
-  private applySavedConfig(savedConfig: MapConfig) {
-    this.mapStyle = this.mapStyles[savedConfig.mapStyleName] || this.config.map.defaultStyle;
-    this.center = savedConfig.center;
-    this.zoom = savedConfig.zoom;
-    this.config.cluster.clusterRadius = savedConfig.clusterRadius;
-    this.config.cluster.clusterMaxZoom = savedConfig.clusterMaxZoom;
-    this.config.popup.fields = savedConfig.popupFields;
-    console.log('Applied config - Style:', this.mapStyle, 'Center:', this.center, 'Zoom:', this.zoom);
-  }
-
-  changeMapStyle(styleUrl: string) {
-    if (this.map) {
-      console.log('Changing map style to:', styleUrl);
-      this.clearMarkers();
-      this.isMapLoaded = false;
-      this.map.setStyle(styleUrl);
-      this.map.once('style.load', () => {
-        this.isMapLoaded = true;
-        this.addClusterSource();
-        this.addClusterLayers();
-        this.updateMarkers();
-      });
-    }
-  }
-
   private initializeMap() {
-    console.log('Initializing map with center:', this.center, 'zoom:', this.zoom, 'style:', this.mapStyle);
+    if (!this.canInitializeMap()) {
+      console.error('Cannot initialize map, missing required configuration');
+      return;
+    }
     try {
       this.map = new mapboxgl.Map({
         container: this.mapContainer.nativeElement,
-        style: this.mapStyle,
-        center:  this.center,
-        zoom: this.zoom,
+        style: this.mapStyle!,
+        center: this.center!,
+        zoom: this.zoom!,
         accessToken: environment.mapboxAccessToken
       });
-      console.log('Map instance created:', this.map);
       this.map.addControl(new mapboxgl.NavigationControl());
       this.map.on('load', () => {
         console.log('Map loaded');
@@ -157,193 +262,212 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges {
         this.addClusterLayers();
         this.updateMarkers();
       });
-      this.map.on('error', (e) => {
-        console.error('Map error:', e);
-      });
+      this.map.on('error', (e) => console.error('Map error:', e));
     } catch (error) {
       console.error('Failed to initialize map:', error);
     }
   }
 
-  private getFirstFarmCenter(): [number, number] | null {
-    if (this.farms.length === 0) {
-      console.warn('No farms data available');
-      return null;
-    }
-    const firstFarm = this.farms[0];
-    if (this.isValidLatLng(firstFarm.latitude, firstFarm.longitude, firstFarm['Poultry ID'])) {
-      return [parseFloat(firstFarm.longitude), parseFloat(firstFarm.latitude)];
-    }
-    console.warn('Invalid coordinates for first farm:', firstFarm);
-    return null;
-  }
-
   private addClusterSource() {
     if (!this.isMapLoaded) {
-      console.warn('Map not loaded, skipping cluster source');
       return;
     }
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: this.farms
-        .filter(farm => this.isValidLatLng(farm.latitude, farm.longitude, farm['Poultry ID']))
+        .filter(farm => this.isValidLatLng(farm))
         .map(farm => ({
-          type: 'Feature',
+          type: 'Feature' as const,
           geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(farm.longitude), parseFloat(farm.latitude)]
+            type: 'Point' as const,
+            coordinates: [this.getLongitude(farm)!, this.getLatitude(farm)!]
           },
           properties: farm
         }))
     };
-    console.log('Cluster source features:', geojson.features.length);
-    if (this.map.getSource('farms')) {
-      (this.map.getSource('farms') as mapboxgl.GeoJSONSource).setData(geojson);
+    if (this.map!.getSource('farms')) {
+      (this.map!.getSource('farms') as mapboxgl.GeoJSONSource).setData(geojson);
     } else {
-      this.map.addSource('farms', {
+      this.map!.addSource('farms', {
         type: 'geojson',
         data: geojson,
         cluster: true,
-        clusterMaxZoom: this.config.cluster.clusterMaxZoom,
-        clusterRadius: this.config.cluster.clusterRadius
+        clusterMaxZoom: this.clusterMaxZoom!,
+        clusterRadius: this.clusterRadius!
       });
     }
   }
 
   private addClusterLayers() {
-    if (!this.isMapLoaded) {
-      console.warn('Map not loaded, skipping cluster layers');
+    if (!this.isMapLoaded || this.map!.getLayer('clusters')) {
       return;
     }
-    if (!this.map.getLayer('clusters')) {
-      this.map.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'farms',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': [
-            'step',
-            ['get', 'point_count'],
-            this.config.cluster.circleColors[0],
-            this.config.cluster.colorSteps[0],
-            this.config.cluster.circleColors[1],
-            this.config.cluster.colorSteps[1],
-            this.config.cluster.circleColors[2]
-          ],
-          'circle-radius': [
-            'step',
-            ['get', 'point_count'],
-            this.config.cluster.circleRadii[0],
-            this.config.cluster.colorSteps[0],
-            this.config.cluster.circleRadii[1],
-            this.config.cluster.colorSteps[1],
-            this.config.cluster.circleRadii[2]
-          ]
-        }
-      });
-    }
-    if (!this.map.getLayer('cluster-count')) {
-      this.map.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'farms',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': this.config.fonts.clusterFont,
-          'text-size': this.config.fonts.textSize
-        }
-      });
-    }
-    this.map.on('click', 'clusters', (e) => {
-      if (!e.features || e.features.length === 0) {
-        return;
+    this.map!.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'farms',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step',
+          ['get', 'point_count'],
+          this.clusterConfig.circleColors[0],
+          this.clusterConfig.colorSteps[0],
+          this.clusterConfig.circleColors[1],
+          this.clusterConfig.colorSteps[1],
+          this.clusterConfig.circleColors[2]
+        ],
+        'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          this.clusterConfig.circleRadii[0],
+          this.clusterConfig.colorSteps[0],
+          this.clusterConfig.circleRadii[1],
+          this.clusterConfig.colorSteps[1],
+          this.clusterConfig.circleRadii[2]
+        ]
       }
+    });
+    this.map!.addLayer({
+      id: 'cluster-count',
+      type: 'symbol',
+      source: 'farms',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': this.clusterConfig.textFont,
+        'text-size': this.clusterConfig.textSize
+      }
+    });
+    this.map!.on('click', 'clusters', (e) => {
+      if (!e.features || e.features.length === 0) return;
       const feature = e.features[0];
       const clusterId = feature.properties?.['cluster_id'];
-      if (typeof clusterId !== 'number') {
-        return;
-      }
+      if (typeof clusterId !== 'number') return;
       const geometry = feature.geometry as GeoJSON.Point;
-      if (!geometry.coordinates) {
-        return;
-      }
-      (this.map.getSource('farms') as mapboxgl.GeoJSONSource).getClusterExpansionZoom(clusterId, (err, zoom) => {
+      (this.map!.getSource('farms') as mapboxgl.GeoJSONSource).getClusterExpansionZoom(clusterId, (err, zoom) => {
         if (err) {
           console.error('Cluster zoom error:', err);
           return;
         }
-        this.map.easeTo({
+        this.map!.easeTo({
           center: geometry.coordinates as [number, number],
-          zoom: zoom || this.map.getZoom() + 2
+          zoom: zoom || this.map!.getZoom() + 1
         });
       });
     });
-    this.map.on('mouseenter', 'clusters', () => {
-      this.map.getCanvas().style.cursor = 'pointer';
+    this.map!.on('mouseenter', 'clusters', () => {
+      this.map!.getCanvas().style.cursor = 'pointer';
     });
-    this.map.on('mouseleave', 'clusters', () => {
-      this.map.getCanvas().style.cursor = '';
+    this.map!.on('mouseleave', 'clusters', () => {
+      this.map!.getCanvas().style.cursor = '';
     });
   }
 
   private buildPopupContent(properties: any): string {
-    let content = `<div style="font-family: ${this.config.fonts.popupFont};">`;
-    this.config.popup.fields.forEach(key => {
-      const value = properties[key] ?? '-';
-      const label = key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase())
-        .trim();
-      content += `<p style="margin: 3px 0; font-size: ${this.config.popup.fontSize};"><strong>${label}:</strong> ${value}</p>`;
+    let content = `<div style="font-family:${this.popupConfig.font};width:${this.popupConfig.width};max-width:${this.popupConfig.maxWidth};padding:${this.popupConfig.padding};background:${this.popupConfig.backgroundColor};font-size:${this.popupConfig.fontSize};display:grid;grid-template-columns:1fr;gap:${this.popupConfig.columnGap};">`;
+    
+    const fields = this.configuration?.selectedColumns || [];
+    const renameMap = new Map<string, string>();
+    
+    // Build rename map using both original and renamed as keys
+    this.configuration?.renames?.forEach(r => {
+        renameMap.set(r.original, r.renamed);
+        // Also map the renamed version back to itself for consistency
+        renameMap.set(r.renamed, r.renamed);
     });
+    
+    // Normalize field names for comparison (same logic as backend)
+    const normalizeField = (field: string): string => {
+        return field.replace(/\s+/g, ' ').trim();
+    };
+    
+    // Create a map of normalized property keys to actual property keys
+    const propertyKeyMap = new Map<string, string>();
+    Object.keys(properties).forEach(key => {
+        const normalized = normalizeField(key);
+        propertyKeyMap.set(normalized, key);
+    });
+    
+    fields.forEach(requestedField => {
+        let actualPropertyKey = requestedField;
+        let foundValue = properties[requestedField];
+        
+        // If direct match doesn't work, try normalized matching
+        if (foundValue === undefined) {
+            const normalizedRequested = normalizeField(requestedField);
+            const matchingKey = propertyKeyMap.get(normalizedRequested);
+            if (matchingKey) {
+                actualPropertyKey = matchingKey;
+                foundValue = properties[matchingKey];
+            }
+        }
+        
+        if (foundValue !== undefined) {
+            let value: string;
+            if (foundValue == null || typeof foundValue === 'object' || (typeof foundValue === 'number' && isNaN(foundValue))) {
+                value = '-';
+            } else {
+                value = foundValue.toString();
+            }
+            let label = renameMap.get(requestedField) || renameMap.get(actualPropertyKey);
+            
+            if (!label) {
+                label = requestedField
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/_/g, ' ')
+                    .replace(/\n/g, ' ') // Handle line breaks
+                    .replace(/\s+/g, ' ') // Normalize spaces
+                    .replace(/\b\w/g, c => c.toUpperCase())
+                    .trim();
+            }
+            
+            content += `<p style="margin:0;font-size:${this.popupConfig.fontSize};"><strong>${label}:</strong> ${value}</p>`;
+        }
+    });
+    
     content += '</div>';
     return content;
-  }
+}
 
   private updateMarkers() {
     if (!this.isMapLoaded) {
-      console.warn('Map not loaded, skipping markers update');
       return;
     }
-    console.log('Updating markers with farms:', this.farms);
     this.clearMarkers();
     this.farms
-      .filter(farm => this.isValidLatLng(farm.latitude, farm.longitude, farm['Poultry ID']))
+      .filter(farm => this.isValidLatLng(farm))
       .forEach(farm => {
-        const coordinates: [number, number] = [parseFloat(farm.longitude), parseFloat(farm.latitude)];
-        const markerElement = createCustomMarker(farm);
+        const coordinates: [number, number] = [this.getLongitude(farm)!, this.getLatitude(farm)!];
+        const markerElement = createCustomMarker(farm, this.markerSvg);
         const marker = new mapboxgl.Marker({ element: markerElement })
           .setLngLat(coordinates)
-          .addTo(this.map);
-
+          .addTo(this.map!);
         markerElement.addEventListener('mouseenter', () => {
-          this.map.getCanvas().style.cursor = 'pointer';
+          this.map!.getCanvas().style.cursor = 'pointer';
           if (this.popup) {
-            const popupContent = this.buildPopupContent(farm);
+            // Close any existing popup
+            this.popup.remove();
+            // Create new popup content
+            const content = this.buildPopupContent(farm);
             this.popup
               .setLngLat(coordinates)
-              .setHTML(popupContent)
-              .addTo(this.map);
+              .setHTML(content)
+              .addTo(this.map!);
           }
         });
-
         markerElement.addEventListener('mouseleave', () => {
-          this.map.getCanvas().style.cursor = '';
+          this.map!.getCanvas().style.cursor = '';
           if (this.popup) {
             this.popup.remove();
           }
         });
-
         this.markers.push(marker);
       });
     this.addClusterSource();
   }
 
   private clearMarkers() {
-    console.log('Clearing markers:', this.markers.length);
     this.markers.forEach(marker => marker.remove());
     this.markers = [];
     if (this.popup) {
@@ -351,19 +475,38 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges {
     }
   }
 
-  private isValidLatLng(lat: any, lng: any, poultryId: string = 'unknown'): boolean {
-    const parsedLat = parseFloat(lat);
-    const parsedLng = parseFloat(lng);
-    const isValid =
-      !isNaN(parsedLat) &&
-      !isNaN(parsedLng) &&
-      parsedLat >= -90 &&
-      parsedLat <= 90 &&
-      parsedLng >= -180 &&
-      parsedLng <= 180;
-    if (!isValid) {
-      console.warn(`Invalid coordinates for poultry ID ${poultryId}: lat=${lat}, lng=${lng}`);
+  private isValidLatLng(farm: any): boolean {
+    const lat = this.getLatitude(farm);
+    const lng = this.getLongitude(farm);
+    return (
+      lat !== null &&
+      lng !== null &&
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    );
+  }
+
+  private getLatitude(farm: any): number | null {
+    const latKeys = ['latitude', 'Latitude', 'LATITUDE'];
+    for (const key of latKeys) {
+      if (farm[key] && !isNaN(parseFloat(farm[key]))) {
+        return parseFloat(farm[key]);
+      }
     }
-    return isValid;
+    return null;
+  }
+
+  private getLongitude(farm: any): number | null {
+    const lonKeys = ['longitude', 'Longitude', 'LONGITUDE'];
+    for (const key of lonKeys) {
+      if (farm[key] && !isNaN(parseFloat(farm[key]))) {
+        return parseFloat(farm[key]);
+      }
+    }
+    return null;
   }
 }

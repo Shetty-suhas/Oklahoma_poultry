@@ -7,6 +7,8 @@
   .mapboxgl-popup {
     z-index: 999;
   }
+
+  
   
   .mapboxgl-popup-content {
     background: #fff;
@@ -29,3 +31,26 @@
     border-top-color: #fff;
     border-bottom-color: #fff;
   }
+
+  .custom-popup {
+    z-index: 1000 !important;
+}
+
+.custom-popup .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.custom-popup .leaflet-popup-content {
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Ensure only one popup is visible */
+.leaflet-popup-pane {
+    pointer-events: auto;
+}
+
+.leaflet-popup-pane .leaflet-popup {
+    position: absolute;
+}

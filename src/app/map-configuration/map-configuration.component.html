@@ -3,8 +3,139 @@
     <h2>Map Configuration</h2>
     <p class="subtitle">Customize how the poultry farm map displays and behaves</p>
   </div>
-  
+
   <div class="config-container">
+    <!-- Map Configurations Section -->
+    <div class="config-section">
+      <div class="config-section-header">
+        <div>
+          <h3>Map Configurations</h3>
+          <p>Select and apply a saved map configuration</p>
+        </div>
+        <div class="loading-spinner" style="display: none;"></div>
+      </div>
+      <div class="config-selector" role="group" aria-label="Map configuration selector">
+        <select [(ngModel)]="selectedMapConfiguration" [ngModelOptions]="{standalone: true}"
+                aria-label="Select a map configuration">
+          <option value="" disabled selected>Select a configuration</option>
+          <option *ngFor="let config of availableMapConfigurations" [value]="config">
+            {{ config }}
+            <span *ngIf="config === currentAppliedConfig"> (Applied)</span>
+          </option>
+        </select>
+        <div class="btn-group">
+          <button class="btn-secondary" [disabled]="!selectedMapConfiguration"
+                  (click)="previewMapConfig(selectedMapConfiguration)"
+                  [attr.aria-label]="'Preview ' + selectedMapConfiguration">
+            Preview
+          </button>
+          <button class="btn-primary" [disabled]="!selectedMapConfiguration"
+                  (click)="applyMapConfiguration(selectedMapConfiguration)"
+                  [attr.aria-label]="'Apply ' + selectedMapConfiguration">
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div *ngIf="showPreviewModal" class="modal-overlay" role="dialog" aria-labelledby="previewModalLabel" (click)="closePreviewModal($event)">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3 id="previewModalLabel">Configuration Preview</h3>
+          <button class="close-btn" (click)="closePreviewModal()" aria-label="Close preview">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div *ngIf="isLoadingPreview" class="loading-spinner"></div>
+        <div *ngIf="!isLoadingPreview && previewData" class="modal-body">
+          <!-- Map Configuration -->
+          <div class="preview-section">
+            <h4>Map Configuration</h4>
+            <div class="preview-grid">
+              <div>
+                <span>Name:</span>
+                <p>{{ previewData.mapConfig.name }}</p>
+              </div>
+              <div>
+                <span>Map Style:</span>
+                <p>{{ previewData.mapConfig.mapStyleName }}</p>
+              </div>
+              <div>
+                <span>Center:</span>
+                <p>[{{ previewData.mapConfig.center[0] }}, {{ previewData.mapConfig.center[1] }}]</p>
+              </div>
+              <div>
+                <span>Zoom:</span>
+                <p>{{ previewData.mapConfig.zoom }}</p>
+              </div>
+              <div>
+                <span>Cluster Radius:</span>
+                <p>{{ previewData.mapConfig.clusterRadius }}px</p>
+              </div>
+              <div>
+                <span>Cluster Max Zoom:</span>
+                <p>{{ previewData.mapConfig.clusterMaxZoom }}</p>
+              </div>
+            </div>
+          </div>
+          <!-- Field Configuration -->
+          <div class="preview-section" *ngIf="previewData.fieldConfig">
+            <h4>Field Configuration</h4>
+            <div class="preview-grid">
+              <div>
+                <span>Configuration Name:</span>
+                <p>{{ previewData.fieldConfig.configurationName }}</p>
+              </div>
+              <div>
+                <span>Collection Name:</span>
+                <p>{{ previewData.fieldConfig.collectionName }}</p>
+              </div>
+              <div>
+                <span>Selected Columns:</span>
+                <ul>
+                  <li *ngFor="let column of previewData.fieldConfig.selectedColumns">{{ column }}</li>
+                </ul>
+              </div>
+              <div>
+                <span>Renamed Fields:</span>
+                <ul>
+                  <li *ngFor="let rename of previewData.fieldConfig.renames">{{ rename.original }} → {{ rename.renamed }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="!previewData.fieldConfig" class="empty-message">
+            No field configuration associated.
+          </div>
+          <!-- Marker Design -->
+          <div class="preview-section" *ngIf="previewData.markerDesign">
+            <h4>Marker Design</h4>
+            <div class="preview-grid">
+              <div>
+                <span>Name:</span>
+                <p>{{ previewData.markerDesign.name }}</p>
+              </div>
+              <div>
+                <span>SVG Code:</span>
+                <pre>{{ previewData.markerDesign.svg }}</pre>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="!previewData.markerDesign" class="empty-message">
+            No marker design associated.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closePreviewModal()" aria-label="Close preview">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Map Style Section -->
     <div class="config-section">
       <h3>Map Style</h3>
@@ -14,12 +145,10 @@
           <option *ngFor="let style of availableMapStyles" [value]="style.id">{{ style.name }}</option>
         </select>
       </div>
-      
+
       <div class="style-preview-grid">
-        <div *ngFor="let style of availableMapStyles" 
-             class="style-preview" 
-             [class.selected]="style.id === config.mapStyleName"
-             (click)="config.mapStyleName = style.id">
+        <div *ngFor="let style of availableMapStyles" class="style-preview"
+          [class.selected]="style.id === config.mapStyleName" (click)="config.mapStyleName = style.id">
           <img [src]="getImagePath(style.id)" [alt]="style.name">
           <span>{{ style.name }}</span>
         </div>
@@ -30,44 +159,24 @@
     <div class="config-section">
       <h3>Default Map Position</h3>
       <p class="section-description">Set the initial center point and zoom level</p>
-      
+
       <div class="input-group">
         <label for="longitude">Longitude:</label>
-        <input 
-          type="number" 
-          id="longitude"
-          [(ngModel)]="config.center[0]" 
-          [ngModelOptions]="{standalone: true}"
-          min="-180" 
-          max="180" 
-          step="0.000001"
-          (ngModelChange)="updateCenter()">
+        <input type="number" id="longitude" [(ngModel)]="config.center[0]" [ngModelOptions]="{standalone: true}"
+          min="-180" max="180" step="0.000001" (ngModelChange)="updateCenter()">
         <span class="error-message" *ngIf="isInvalidCoordinate('longitude')">Must be between -180 and 180</span>
       </div>
-      
+
       <div class="input-group">
         <label for="latitude">Latitude:</label>
-        <input 
-          type="number" 
-          id="latitude"
-          [(ngModel)]="config.center[1]" 
-          [ngModelOptions]="{standalone: true}"
-          min="-90" 
-          max="90" 
-          step="0.000001"
-          (ngModelChange)="updateCenter()">
+        <input type="number" id="latitude" [(ngModel)]="config.center[1]" [ngModelOptions]="{standalone: true}"
+          min="-90" max="90" step="0.000001" (ngModelChange)="updateCenter()">
         <span class="error-message" *ngIf="isInvalidCoordinate('latitude')">Must be between -90 and 90</span>
       </div>
-      
+
       <div class="input-group slider-group">
         <label for="zoom">Zoom Level: <span class="value-display">{{ config.zoom.toFixed(1) }}</span></label>
-        <input 
-          type="range" 
-          id="zoom"
-          [(ngModel)]="config.zoom" 
-          [ngModelOptions]="{standalone: true}"
-          min="1" 
-          max="20" 
+        <input type="range" id="zoom" [(ngModel)]="config.zoom" [ngModelOptions]="{standalone: true}" min="1" max="20"
           step="0.1">
         <div class="range-labels">
           <span>Far</span>
@@ -80,33 +189,23 @@
     <div class="config-section">
       <h3>Clustering Options</h3>
       <p class="section-description">Configure how farms are grouped together at different zoom levels</p>
-      
+
       <div class="input-group slider-group">
-        <label for="clusterRadius">Cluster Radius: <span class="value-display">{{ config.clusterRadius }}px</span></label>
-        <input 
-          type="range" 
-          id="clusterRadius"
-          [(ngModel)]="config.clusterRadius" 
-          [ngModelOptions]="{standalone: true}"
-          min="10" 
-          max="100" 
-          step="5">
+        <label for="clusterRadius">Cluster Radius: <span class="value-display">{{ config.clusterRadius
+            }}px</span></label>
+        <input type="range" id="clusterRadius" [(ngModel)]="config.clusterRadius" [ngModelOptions]="{standalone: true}"
+          min="10" max="100" step="5">
         <div class="range-labels">
           <span>Small</span>
           <span>Large</span>
         </div>
       </div>
-      
+
       <div class="input-group slider-group">
-        <label for="clusterMaxZoom">Max Zoom for Clusters: <span class="value-display">{{ config.clusterMaxZoom }}</span></label>
-        <input 
-          type="range" 
-          id="clusterMaxZoom"
-          [(ngModel)]="config.clusterMaxZoom" 
-          [ngModelOptions]="{standalone: true}"
-          min="10" 
-          max="20" 
-          step="1">
+        <label for="clusterMaxZoom">Max Zoom for Clusters: <span class="value-display">{{ config.clusterMaxZoom
+            }}</span></label>
+        <input type="range" id="clusterMaxZoom" [(ngModel)]="config.clusterMaxZoom"
+          [ngModelOptions]="{standalone: true}" min="10" max="20" step="1">
         <div class="range-labels">
           <span>Always Cluster</span>
           <span>Rarely Cluster</span>
@@ -114,27 +213,317 @@
       </div>
     </div>
 
-    <!-- Popup Information Section -->
+    <!-- Configurations Section -->
     <div class="config-section">
-      <h3>Popup Information</h3>
-      <p class="section-description">Select which fields to display when hovering over a farm</p>
-      
-      <div class="checkbox-group">
-        <div *ngFor="let field of availablePopupFields" class="checkbox-item">
-          <label>
-            <input 
-              type="checkbox" 
-              [checked]="isFieldSelected(field)" 
-              (change)="togglePopupField(field)">
-            <span>{{ field }}</span>
-          </label>
+      <h3>Fields Configurations</h3>
+      <p class="section-description">Select a saved configuration</p>
+      <div class="collection-selector">
+        <select [(ngModel)]="selectedConfiguration" [ngModelOptions]="{standalone: true}"
+          (ngModelChange)="onConfigurationChange()">
+          <option value="" disabled selected>Select a configuration</option>
+          <option *ngFor="let config of availableConfigurations" [value]="config">{{ config }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Marker Selection Section -->
+    <div class="config-section">
+      <h3>Marker Selection</h3>
+      <p class="section-description">Select a saved marker design</p>
+      <div class="collection-selector">
+        <select [(ngModel)]="selectedMarker" [ngModelOptions]="{standalone: true}">
+          <option value="" disabled selected>Select a marker</option>
+          <option *ngFor="let marker of availableMarkers" [value]="marker">{{ marker }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="config-actions">
+      <button class="btn-save" (click)="saveConfiguration()">Save Configuration</button>
+    </div>
+
+    <!-- Configuration Name Modal -->
+    <div class="modal" *ngIf="showConfigNameModal">
+      <div class="modal-content">
+        <h3>Enter Configuration Name</h3>
+        <p>Provide a unique name for this map configuration.</p>
+        <div class="input-group">
+          <label for="modalConfigName">Configuration Name:</label>
+          <input type="text" id="modalConfigName" [(ngModel)]="configurationName" [ngModelOptions]="{standalone: true}"
+            placeholder="Enter configuration name" required>
+          <span class="error-message" *ngIf="configurationNameError">{{ configurationNameError }}</span>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="cancelSaveConfiguration()">Cancel</button>
+          <button class="btn-primary" (click)="confirmSaveConfiguration()"
+            [disabled]="!configurationName.trim()">Save</button>
         </div>
       </div>
     </div>
-  </div>
-  
-  <div class="config-actions">
-    <button class="btn-reset" (click)="resetToDefaults()">Reset to Defaults</button>
-    <button class="btn-save" (click)="saveConfiguration()">Save Configuration</button>
+
+    <!-- Popup Information Section with Tabs -->
+    <div class="config-section">
+      <h3>Popup Information</h3>
+      <p class="section-description">Configure what information displays when hovering over a farm</p>
+
+      <div class="popup-tabs">
+        <div class="tab-headers">
+          <button [class.active]="activePopupTab === 'upload'" (click)="activePopupTab = 'upload'">
+            Upload Data
+          </button>
+          <button [class.active]="activePopupTab === 'fields-config'" (click)="activePopupTab = 'fields-config'">
+            Fields Configuration
+          </button>
+          <button [class.active]="activePopupTab === 'marker-design'" (click)="activePopupTab = 'marker-design'">
+            Marker Design
+          </button>
+        </div>
+
+        <div class="tab-content">
+          <!-- Data Upload Tab -->
+          <div *ngIf="activePopupTab === 'upload'" class="tab-pane">
+            <p class="upload-instructions">
+              Upload a CSV or Excel file containing farm data. The system will use this data to populate the map.
+            </p>
+
+            <div class="upload-note">
+              <strong>Note:</strong> Two columns are mandatory in your file:
+              <ul>
+                <li><strong>Latitude</strong> - The north-south position of each farm (decimal degrees)</li>
+                <li><strong>Longitude</strong> - The east-west position of each farm (decimal degrees)</li>
+              </ul>
+              These fields are essential for displaying markers on the map.
+            </div>
+
+            <div class="file-upload-container">
+              <input type="file" id="dataFileUpload" (change)="handleFileUpload($event)"
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+              <label for="dataFileUpload" class="file-upload-button">
+                Choose CSV or Excel File
+              </label>
+              <span class="file-name" *ngIf="selectedFileName">{{ selectedFileName }}</span>
+            </div>
+
+            <div class="input-group collection-name" *ngIf="isNewUpload">
+              <label for="collectionName">Data Set Name:</label>
+              <input type="text" id="collectionName" [(ngModel)]="collectionName" [ngModelOptions]="{standalone: true}"
+                placeholder="Enter a unique name for this data set" required>
+              <span class="error-message" *ngIf="csvImportStep >= 2 && !collectionName.trim()">Data set name is
+                required</span>
+            </div>
+
+            <button class="btn-upload" [disabled]="!selectedFileName || !collectionName.trim() || isProcessingCsv"
+              (click)="uploadFile()">
+              Upload and Process Data
+            </button>
+
+            <!-- Collection Selection -->
+            <div class="collection-selector" *ngIf="availableCollections.length > 0">
+              <h4>View Existing Data</h4>
+              <select [(ngModel)]="selectedCollection" [ngModelOptions]="{standalone: true}"
+                (change)="selectCollection(selectedCollection, 'upload')">
+                <option value="" disabled selected>Select any existing data</option>
+                <option *ngFor="let collection of availableCollections" [value]="collection">{{ collection }}</option>
+              </select>
+            </div>
+
+            <div class="upload-status" *ngIf="uploadStatus">
+              {{ uploadStatus }}
+            </div>
+
+            <div class="data-preview" *ngIf="csvImportStep === 3">
+              <h4>Uploaded Data Preview</h4>
+
+              <!-- Error message if no data -->
+              <div class="error-message" *ngIf="csvPreviewData.length === 0 && uploadStatus">
+                {{ uploadStatus }}
+              </div>
+
+              <!-- Page size selector -->
+              <div class="page-size-selector">
+                <label for="pageSize">Records per page:</label>
+                <select id="pageSize" [(ngModel)]="pageSize" [ngModelOptions]="{standalone: true}"
+                  (change)="updatePageSize()">
+                  <option value="10">10</option>
+                  <option value="30">30</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+
+              <!-- Fixed table wrapper with guaranteed horizontal scroll -->
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th *ngFor="let header of csvHeaders">{{ header }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of csvPreviewData">
+                      <td *ngFor="let header of csvHeaders">{{ row[header] !== undefined && row[header] !== null ?
+                        row[header] : '-' }}</td>
+                    </tr>
+                    <!-- Add empty rows to maintain consistent table height -->
+                    <ng-container *ngIf="csvPreviewData.length < pageSize">
+                      <tr *ngFor="let i of emptyRowsArray">
+                        <td *ngFor="let header of csvHeaders"> </td>
+                      </tr>
+                    </ng-container>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Enhanced pagination container -->
+              <div class="pagination-container">
+                <!-- Improved pagination controls -->
+                <div class="pagination-controls" *ngIf="totalPages > 1">
+                  <button class="btn-pagination prev-next" [disabled]="currentPage === 1"
+                    (click)="changePage(currentPage - 1)">
+                    <span>← Previous</span>
+                  </button>
+                  <button class="btn-pagination" [class.active]="currentPage === 1" (click)="changePage(1)">1</button>
+                  <span *ngIf="currentPage > 4">...</span>
+                  <ng-container *ngFor="let page of getPaginationRange()">
+                    <button *ngIf="page !== 1 && page !== totalPages" class="btn-pagination"
+                      [class.active]="currentPage === page" (click)="changePage(page)">
+                      {{ page }}
+                    </button>
+                  </ng-container>
+                  <span *ngIf="currentPage < totalPages - 3">...</span>
+                  <button *ngIf="totalPages > 1" class="btn-pagination" [class.active]="currentPage === totalPages"
+                    (click)="changePage(totalPages)">
+                    {{ totalPages }}
+                  </button>
+                  <button class="btn-pagination prev-next" [disabled]="currentPage === totalPages"
+                    (click)="changePage(currentPage + 1)">
+                    <span>Next →</span>
+                  </button>
+                </div>
+
+                <!-- Pagination info -->
+                <div class="pagination-info" *ngIf="totalPages > 1">
+                  Showing page {{ currentPage }} of {{ totalPages }}
+                  ({{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, totalRecords) }} of {{
+                  totalRecords }} records)
+                </div>
+
+                <!-- Action buttons -->
+                <div class="action-buttons">
+                  <div class="btn-group">
+                    <button class="btn-action btn-secondary" (click)="cancelUpload()">
+                      Cancel
+                    </button>
+                    <button *ngIf="isNewUpload" class="btn-action btn-primary" (click)="confirmUpload()">
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fields Configuration Tab -->
+          <div *ngIf="activePopupTab === 'fields-config'" class="tab-pane">
+            <h4>Select Data Collection</h4>
+            <div class="collection-selector" *ngIf="availableCollections.length > 0">
+              <select [(ngModel)]="selectedFieldsCollection" [ngModelOptions]="{standalone: true}"
+                (change)="selectCollection(selectedFieldsCollection, 'fields-config')">
+                <option value="" disabled selected>Select a collection</option>
+                <option *ngFor="let collection of availableCollections" [value]="collection">{{ collection }}</option>
+              </select>
+            </div>
+            <div *ngIf="availableCollections.length === 0" class="empty-state">
+              No collections available. Upload data in the Upload Data tab.
+            </div>
+
+            <div *ngIf="selectedFieldsCollection" class="fields-section">
+              <div class="input-group config-name">
+                <label for="configurationName">Configuration Name:</label>
+                <input type="text" id="configurationName" [(ngModel)]="configurationName"
+                  [ngModelOptions]="{standalone: true}" placeholder="Enter a name for this configuration" required>
+                <span class="error-message" *ngIf="configurationNameError">{{ configurationNameError }}</span>
+              </div>
+
+              <h4>Field Selection</h4>
+              <p>Select which fields to display when hovering over a farm</p>
+              <div class="checkbox-group">
+                <div *ngFor="let field of availablePopupFields" class="checkbox-item">
+                  <label>
+                    <input type="checkbox" [checked]="isFieldSelected(field)" (change)="togglePopupField(field)">
+                    <span>{{ getDisplayName(field) }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <h4>Rename Fields</h4>
+              <p class="rename-instructions">
+                Customize how field names appear in map popups. Create more user-friendly labels while preserving your
+                original data structure.
+              </p>
+              <div class="rename-list">
+                <div *ngFor="let field of selectedPopupFields" class="rename-item">
+                  <div class="field-name">{{ field }}</div>
+                  <div class="field-input">
+                    <input type="text" [placeholder]="'Display name for ' + field" [ngModel]="getRename(field)"
+                      (ngModelChange)="updateRename(field, $event)" [ngModelOptions]="{standalone: true}"
+                      [class.customized]="getRename(field) !== field">
+                  </div>
+                </div>
+                <div *ngIf="selectedPopupFields.length === 0" class="empty-state">
+                  No fields selected. Select fields above to display on the map.
+                </div>
+              </div>
+
+              <div class="action-buttons">
+                <div class="btn-group">
+                  <button class="btn-action btn-secondary" (click)="cancelFieldsConfig()">
+                    Cancel
+                  </button>
+                  <button class="btn-action btn-primary" (click)="confirmFieldsConfig()"
+                    [disabled]="selectedPopupFields.length === 0 || !configurationName.trim()">
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Marker Design Tab -->
+          <div *ngIf="activePopupTab === 'marker-design'" class="tab-pane">
+            <h4>Custom Marker Design</h4>
+            <p class="section-description">Design a custom SVG marker for farms on the map</p>
+
+            <div class="input-group">
+              <label for="markerDesignName">Marker Design Name:</label>
+              <input type="text" id="markerDesignName" [(ngModel)]="markerDesignName"
+                [ngModelOptions]="{standalone: true}"
+                placeholder="Enter a name for this marker design (e.g., Red Circle Marker)" required>
+              <span class="error-message" *ngIf="markerDesignNameError">{{ markerDesignNameError }}</span>
+            </div>
+
+            <div class="input-group">
+              <label for="markerDesign">SVG Code:</label>
+              <textarea id="markerDesign" [(ngModel)]="markerDesign" [ngModelOptions]="{standalone: true}"
+                placeholder="Enter your SVG code here (e.g., <svg width='40' height='40'><circle cx='20' cy='20' r='15' fill='red'/></svg>)"
+                rows="30" cols="135"></textarea>
+              <span class="error-message" *ngIf="markerDesignError">{{ markerDesignError }}</span>
+            </div>
+
+            <div class="action-buttons" style="margin-top: 20px;">
+              <div class="btn-group">
+                <button class="btn-action btn-secondary" (click)="cancelMarkerDesign()">
+                  Cancel
+                </button>
+                <button class="btn-action btn-primary" (click)="saveMarkerDesign()"
+                  [disabled]="!markerDesign.trim() || !markerDesignName.trim()">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
