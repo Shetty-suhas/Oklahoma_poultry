@@ -21,7 +21,7 @@ interface FieldConfig {
   templateUrl: './poultry-map.component.html',
   styleUrls: ['./poultry-map.component.css', '../custom-marker/custom-marker.css']
 })
-export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, OnDestroy {
+export class PoultryMapComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('mapContainer') mapContainer!: ElementRef;
   @Input() selectedConfiguration: string = '';
 
@@ -81,18 +81,7 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, On
       offset: [0, -10],
       maxWidth: this.popupConfig.maxWidth
     });
-  }
-
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['selectedConfiguration']) {
-      if (this.selectedConfiguration) {
-        console.log('Selected configuration changed:', this.selectedConfiguration);
-        this.loadConfiguration();
-      } else {
-        console.warn('No configuration selected');
-        this.clearMap();
-      }
-    }
+    this.loadConfiguration();
   }
 
   ngAfterViewInit() {
@@ -115,7 +104,7 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, On
 
   private loadConfiguration() {
     this.subscriptions.push(
-      this.http.get<MapConfig>('https://my-flask-app-1033096764168.asia-south1.run.app//get-selected-map-config').subscribe({
+      this.http.get<MapConfig>('https://my-flask-app-1033096764168.asia-south1.run.app/get-selected-map-config').subscribe({
         next: (mapConfig) => {
           if (!mapConfig) {
             console.error('Invalid or missing map configuration');
@@ -125,7 +114,7 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, On
           this.applyMapConfig(mapConfig);
           if (mapConfig.configurationName) {
             this.subscriptions.push(
-              this.http.get<FieldConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app//configurations/${mapConfig.configurationName}`).subscribe({
+              this.http.get<FieldConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app/configurations/${mapConfig.configurationName}`).subscribe({
                 next: (fieldConfig) => {
                   this.configuration = fieldConfig;
                   if (fieldConfig?.collectionName && fieldConfig.selectedColumns.length) {
@@ -169,7 +158,7 @@ export class PoultryMapComponent implements OnInit, AfterViewInit, OnChanges, On
     };
     console.log('Request body:', requestBody);
     this.subscriptions.push(
-      this.http.post<any[]>(`https://my-flask-app-1033096764168.asia-south1.run.app//collections/${collectionName}`, requestBody).subscribe({
+      this.http.post<any[]>(`https://my-flask-app-1033096764168.asia-south1.run.app/collections/${collectionName}`, requestBody).subscribe({
         next: (data) => {
           this.farms = data;
           console.log('Loaded collection data:', this.farms);

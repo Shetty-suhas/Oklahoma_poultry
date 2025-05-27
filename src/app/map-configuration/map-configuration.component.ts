@@ -128,20 +128,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.http.get<MapConfig>('https://my-flask-app-1033096764168.asia-south1.run.app//get-selected-map-config').subscribe({
-      next: (config) => {
-        this.selectedMapConfiguration = config.name;
-        this.currentAppliedConfig = config.name;
-        this.toastr.success('Selected map configuration loaded: ' + config.name);
-        this.isLoading = false;
-      },
-      error: (err) => {
-        this.toastr.error('Failed to load selected map configuration');
-        this.selectedMapConfiguration = '';
-        this.currentAppliedConfig = '';
-        this.isLoading = false;
-      }
-    });
+    this.fetchMapConfig();
   
     this.routerSubscription = this.router.events.subscribe(event => {
       if (event instanceof NavigationStart && this.uploadedCollectionName) {
@@ -159,15 +146,32 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     }
   }
 
+  fetchMapConfig():void { 
+    this.http.get<MapConfig>('https://my-flask-app-1033096764168.asia-south1.run.app/get-selected-map-config').subscribe({
+      next: (config) => {
+        this.selectedMapConfiguration = config.name;
+        this.currentAppliedConfig = config.name;
+        this.toastr.success('Selected map configuration loaded: ' + config.name);
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.toastr.error('Failed to load selected map configuration');
+        this.selectedMapConfiguration = '';
+        this.currentAppliedConfig = '';
+        this.isLoading = false;
+      }
+    });
+  }
+
   fetchMarkers(): void { 
-    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app//marker-designs').subscribe({
+    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app/marker-designs').subscribe({
       next: (markers) => this.availableMarkers = markers,
       error: (err) => console.error('Failed to load markers', err)
     });
   }
 
   fetchMapConfigurations(): void {
-    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app//map-configs').subscribe({
+    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app/map-configs').subscribe({
       next: (configs) => {
         this.availableMapConfigurations = configs;
       },
@@ -198,7 +202,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   }
 
   fetchConfigurations(): void {
-    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app//configurations').subscribe({
+    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app/configurations').subscribe({
       next: (configs) => {
         this.availableConfigurations = configs;
       },
@@ -231,11 +235,12 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
         svg: this.markerDesign.trim()
       }
     };
-    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//save-marker-design', payload).subscribe({
+    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app/save-marker-design', payload).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message; 
         this.toastr.success(this.uploadStatus || "Marker design saved successfully");
         this.cancelMarkerDesign();
+        this.fetchMarkers();
       },
       error: (err) => {
         this.markerDesignError = err.error?.error || 'Failed to save marker design';
@@ -319,7 +324,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   }
 
   fetchCollectionColumns(collectionName: string): void {
-    this.http.get<{ columns: string[] }>(`https://my-flask-app-1033096764168.asia-south1.run.app//columns/${collectionName}`).subscribe({
+    this.http.get<{ columns: string[] }>(`https://my-flask-app-1033096764168.asia-south1.run.app/columns/${collectionName}`).subscribe({
       next: (response) => {
         this.availablePopupFields = response.columns;
         this.selectedPopupFields = [];
@@ -386,7 +391,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
       renames: [...this.renames]
     };
 
-    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//save-config', configData).subscribe({
+    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app/save-config', configData).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message || 'Configuration saved successfully';
         this.fetchConfigurations();
@@ -469,10 +474,11 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
       configurationName: this.selectedConfiguration || '',
       markerDesignName: this.selectedMarker || ''
     };
-    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//save-map-config', configData).subscribe({
+    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app/save-map-config', configData).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message || 'Configuration saved successfully';
         this.toastr.success(this.uploadStatus || "Configuration saved successfully");
+        this.fetchMapConfigurations();
       },
       error: (err) => {
         this.uploadStatus = `Error saving configuration: ${err.error?.error || 'Request failed'}`;
@@ -552,7 +558,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     formData.append('file', this.csvFile, this.csvFile.name);
     formData.append('collectionName', this.collectionName);
 
-    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//upload', formData).subscribe({
+    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app/upload', formData).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message || 'File uploaded successfully';
         this.isProcessingCsv = false;
@@ -574,7 +580,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
 
   fetchUploadedData(collectionName: string): void {
     console.log('Fetching data for collection:', collectionName, 'page:', this.currentPage, 'per_page:', this.pageSize);
-    this.http.get<any>(`https://my-flask-app-1033096764168.asia-south1.run.app//poultry-data/${collectionName}?page=${this.currentPage}&per_page=${this.pageSize}`).subscribe({
+    this.http.get<any>(`https://my-flask-app-1033096764168.asia-south1.run.app/poultry-data/${collectionName}?page=${this.currentPage}&per_page=${this.pageSize}`).subscribe({
       next: (response: any) => {
         console.log('Raw response:', response);
         console.log('Raw first document:', response.data[0]);
@@ -615,7 +621,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     }
 
     console.log('Confirming upload, collection:', this.uploadedCollectionName);
-    this.http.post(`https://my-flask-app-1033096764168.asia-south1.run.app//confirm/${this.uploadedCollectionName}`, {}).subscribe({
+    this.http.post(`https://my-flask-app-1033096764168.asia-south1.run.app/confirm/${this.uploadedCollectionName}`, {}).subscribe({
       next: (response: any) => {
         this.uploadStatus = response.message || 'Collection confirmed';
         this.uploadedCollectionName = null;
@@ -643,7 +649,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   discardTemporaryCollection(): void {
     if (this.uploadedCollectionName) {
       console.log('Discarding temporary collection:', this.uploadedCollectionName);
-      this.http.delete(`https://my-flask-app-1033096764168.asia-south1.run.app//discard/${this.uploadedCollectionName}`).subscribe({
+      this.http.delete(`https://my-flask-app-1033096764168.asia-south1.run.app/discard/${this.uploadedCollectionName}`).subscribe({
         next: () => {
           this.uploadedCollectionName = null;
           this.csvPreviewData = [];
@@ -659,7 +665,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
   }
 
   fetchCollections(): void {
-    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app//collections').subscribe({
+    this.http.get<string[]>('https://my-flask-app-1033096764168.asia-south1.run.app/collections').subscribe({
       next: (collections) => {
         this.availableCollections = collections;
         console.log('Collections fetched:', this.availableCollections);
@@ -699,7 +705,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
     this.previewData = null;
 
     // Fetch map configuration
-    this.http.get<MapConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app//map-config/${configName}`).subscribe({
+    this.http.get<MapConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app/map-config/${configName}`).subscribe({
       next: (mapConfig) => {
         this.previewData = { mapConfig };
         this.config = { ...mapConfig };
@@ -708,7 +714,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
 
         // Fetch field configuration if configurationName exists
         if (mapConfig.configurationName) {
-          this.http.get<FieldConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app//configurations/${mapConfig.configurationName}`).subscribe({
+          this.http.get<FieldConfig>(`https://my-flask-app-1033096764168.asia-south1.run.app/configurations/${mapConfig.configurationName}`).subscribe({
             next: (fieldConfig) => {
               this.previewData!.fieldConfig = fieldConfig;
               this.selectedPopupFields = fieldConfig.selectedColumns;
@@ -724,7 +730,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
 
         // Fetch marker design if markerDesignName exists
         if (mapConfig.markerDesignName) {
-          this.http.get<{ markerDesign: MarkerDesign }>(`https://my-flask-app-1033096764168.asia-south1.run.app//marker-design/${mapConfig.markerDesignName}`).subscribe({
+          this.http.get<{ markerDesign: MarkerDesign }>(`https://my-flask-app-1033096764168.asia-south1.run.app/marker-design/${mapConfig.markerDesignName}`).subscribe({
             next: (response) => {
               this.previewData!.markerDesign = response.markerDesign;
               this.isLoadingPreview = false;
@@ -762,7 +768,7 @@ export class MapConfigurationComponent implements OnInit, OnDestroy {
 
   applyMapConfiguration(config: string): void {
     this.isLoading = true;
-    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app//set-selected-map-config', { name: config }).subscribe({
+    this.http.post('https://my-flask-app-1033096764168.asia-south1.run.app/set-selected-map-config', { name: config }).subscribe({
       next: (response: any) => {
         this.currentAppliedConfig = config;
         this.uploadStatus = response.message || 'Map configuration applied';
